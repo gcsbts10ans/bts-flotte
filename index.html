@@ -482,7 +482,7 @@ function renderSig(){
         return true;
     });
     const el = document.getElementById('sigList');
-    if (!rows.length){ el.innerHTML = '<div class="empty">Aucun signalement dans ce filtre.</div>'; return; }
+    if (!rows.length){ el.innerHTML = '<div class="empty">'+(SIG_READY?'Aucun signalement dans ce filtre.':'Chargement…')+'</div>'; return; }
     el.innerHTML = rows.map(s => {
         const tm = TYPE_META[s.type];
         const ph = (s.photos && s.photos.length) ? ' <span class="chip c-gray">'+s.photos.length+' photo'+(s.photos.length>1?'s':'')+'</span>' : '';
@@ -825,16 +825,23 @@ async function loadRefs(){
 
 /* ---- signalements ---- */
 let SIG_RAW = {al:[], an:[], ra:[], pp:[]};
+let SIG_READY = false;
 function mapAlerte(d){ const x=d.data(); return {id:'al_'+d.id, type:'alerte',   objet:(x.type||'Alerte'),  detail:x.message||'',     ch:x.from||'',      tour:tourOf(x.vehicule), quand:fmtQuand(x.at), statut:x.statut||(x.lu?'Traité':'Nouveau'), note:x.note||'', site:'', photos:[], at:x.at||0}; }
 function mapAnomalie(d){ const x=d.data(); return {id:'an_'+d.id, type:'anomalie', objet:x.nature||'Anomalie', detail:(x.site?('['+x.site+'] '):'')+(x.description||''), site:(x.site||''), ch:(x.chauffeur||x.from||''), tour:tourOf(x.vehicule), quand:fmtQuand(x.at), statut:x.statut||(x.lu?'Traité':'Nouveau'), note:x.note||'', photos:(x.photos||[]), at:x.at||0}; }
 function mapRapport(d){ const x=d.data(); return {id:'ra_'+d.id, type:'rapport',  objet:x.objet||'Rapport circonstancié',   detail:x.description||'', ch:x.chauffeur||'', tour:tourOf(x.vehicule), quand:fmtQuand(x.at), statut:x.statut||(x.lu?'Traité':'Nouveau'), note:x.note||'', site:'', photos:(x.photos||[]), signature:(x.signature||''), at:x.at||0}; }
 function mapPrisePoste(d){ const x=d.data(); return {id:'pp_'+d.id, type:'prise_poste', objet:'Problème véhicule (prise de poste)', detail:(x.detail||''), site:'', ch:(x.chauffeur||''), tour:tourOf(x.vehicule), quand:fmtQuand(x.at), statut:x.statut||(x.lu?'Traité':'Nouveau'), note:x.note||'', photos:(x.photos||[]), at:x.at||0}; }
 function rebuildSig(){ SIGNALEMENTS = [...SIG_RAW.al, ...SIG_RAW.an, ...SIG_RAW.ra, ...SIG_RAW.pp].sort((a,b)=>b.at-a.at); }
 function listenSignalements(){
-    db.collection('chauffeurs_alertes').orderBy('at','desc').limit(50).onSnapshot(s=>{ SIG_RAW.al=s.docs.map(mapAlerte); rebuildSig(); updateBadges(); refreshActive(); }, e=>console.error('alertes',e));
-    db.collection('chauffeurs_anomalies').orderBy('at','desc').limit(50).onSnapshot(s=>{ SIG_RAW.an=s.docs.map(mapAnomalie); rebuildSig(); updateBadges(); refreshActive(); }, e=>console.error('anomalies',e));
-    db.collection('chauffeurs_rapports').orderBy('at','desc').limit(50).onSnapshot(s=>{ SIG_RAW.ra=s.docs.map(mapRapport); rebuildSig(); updateBadges(); refreshActive(); }, e=>console.error('rapports',e));
-    db.collection('chauffeurs_prise_poste').where('probleme','==',true).onSnapshot(s=>{ SIG_RAW.pp=s.docs.map(mapPrisePoste); rebuildSig(); updateBadges(); refreshActive(); }, e=>console.error('prise_poste',e));
+    const upd = (key, snap, mapper) => {
+        if (snap.metadata.fromCache && snap.empty) return; // ignore un cache vide transitoire
+        if (!snap.metadata.fromCache) SIG_READY = true;
+        SIG_RAW[key] = snap.docs.map(mapper);
+        rebuildSig(); updateBadges(); refreshActive();
+    };
+    db.collection('chauffeurs_alertes').orderBy('at','desc').limit(50).onSnapshot(s=>upd('al',s,mapAlerte), e=>console.error('alertes',e));
+    db.collection('chauffeurs_anomalies').orderBy('at','desc').limit(50).onSnapshot(s=>upd('an',s,mapAnomalie), e=>console.error('anomalies',e));
+    db.collection('chauffeurs_rapports').orderBy('at','desc').limit(50).onSnapshot(s=>upd('ra',s,mapRapport), e=>console.error('rapports',e));
+    db.collection('chauffeurs_prise_poste').where('probleme','==',true).onSnapshot(s=>upd('pp',s,mapPrisePoste), e=>console.error('prise_poste',e));
 }
 
 /* ---- messages ---- */
