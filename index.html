@@ -777,6 +777,7 @@ const FBCONFIG = {
 let db = null, _tries = 0;
 const TODAY = new Date().toISOString().slice(0,10);
 function fbInit(){
+    if (db) return; // déjà initialisé — évite un 2e enablePersistence (erreur "already started")
     try { if (window.firebase && !firebase.apps.length) firebase.initializeApp(FBCONFIG);
           if (window.firebase){ db = firebase.firestore(); db.enablePersistence({ synchronizeTabs:true }).catch(function(){}); } }
     catch(e){ console.error('fbInit', e); }
