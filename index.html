@@ -779,7 +779,11 @@ const TODAY = new Date().toISOString().slice(0,10);
 function fbInit(){
     if (db) return; // déjà initialisé — évite un 2e enablePersistence (erreur "already started")
     try { if (window.firebase && !firebase.apps.length) firebase.initializeApp(FBCONFIG);
-          if (window.firebase){ db = firebase.firestore(); db.enablePersistence({ synchronizeTabs:true }).catch(function(){}); } }
+          if (window.firebase){
+              db = firebase.firestore();
+              try { db.settings({ experimentalAutoDetectLongPolling: true }); } catch(_){}  // contourne les firewalls (CHU) qui bloquent le streaming
+              db.enablePersistence({ synchronizeTabs:true }).catch(function(){});
+          } }
     catch(e){ console.error('fbInit', e); }
 }
 function respLogin(){
