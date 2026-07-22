@@ -835,7 +835,7 @@ function rebuildSig(){ SIGNALEMENTS = [...SIG_RAW.al, ...SIG_RAW.an, ...SIG_RAW.
 function listenSignalements(){
     const upd = (key, snap, mapper) => {
         if (snap.metadata.fromCache && snap.empty) return; // ignore un cache vide transitoire
-        if (!snap.metadata.fromCache) SIG_READY = true;
+        if (!snap.metadata.fromCache || !snap.empty) SIG_READY = true; // serveur (même vide) OU données déjà présentes (cache)
         SIG_RAW[key] = snap.docs.map(mapper);
         rebuildSig(); updateBadges(); refreshActive();
     };
@@ -919,11 +919,12 @@ function updateBadges(){
 /* ---- démarrage ---- */
 async function loadAll(){
     toast('Chargement des données…');
+    listenStatuts(); listenSignalements(); listenMessages(); listenPositions(); listenTermines(); // temps réel immédiat (n'attend pas le référentiel)
     try {
         await loadRefs();
-        listenStatuts(); listenSignalements(); listenMessages(); listenPositions(); listenTermines();
         ensureGcsCoords();
         loadEtat(30);
+        refreshActive(); // ré-affiche avec noms/tournées résolus
     } catch(e){ console.error(e); toast('Erreur de chargement — voir console','warn'); }
     go('accueil');
 }
